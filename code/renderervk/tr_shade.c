@@ -383,15 +383,15 @@ static void ProjectDlightTexture( void ) {
 	vec3_t	origin;
 	float	*texCoords;
 	byte	*colors;
-	byte	clipBits[SHADER_MAX_VERTEXES];
+	static byte	clipBits[SHADER_MAX_VERTEXES];
 #ifdef USE_VULKAN
 	uint32_t pipeline;
 	qboolean rebindIndex = qfalse;
 #else
-	float	texCoordsArray[SHADER_MAX_VERTEXES][2];
-	byte	colorArray[SHADER_MAX_VERTEXES][4];
+	static float	texCoordsArray[SHADER_MAX_VERTEXES][2];
+	static byte	colorArray[SHADER_MAX_VERTEXES][4];
 #endif
-	glIndex_t hitIndexes[SHADER_MAX_INDEXES];
+	static glIndex_t hitIndexes[SHADER_MAX_INDEXES];
 	int		numIndexes;
 	float	scale;
 	float	radius;

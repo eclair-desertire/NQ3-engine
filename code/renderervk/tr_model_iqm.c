@@ -1260,8 +1260,8 @@ void RB_IQMSurfaceAnim( const surfaceType_t *surface ) {
 	srfIQModel_t	*surf = (srfIQModel_t *)surface;
 	iqmData_t	*data = surf->data;
 	float		poseMats[IQM_MAX_JOINTS * 12];
-	float		influenceVtxMat[SHADER_MAX_VERTEXES * 12];
-	float		influenceNrmMat[SHADER_MAX_VERTEXES * 9];
+	static float		influenceVtxMat[SHADER_MAX_VERTEXES * 12];
+	static float		influenceNrmMat[SHADER_MAX_VERTEXES * 9];
 	int		i;
 
 	float		*xyz;
