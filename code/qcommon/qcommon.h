@@ -290,10 +290,13 @@ PROTOCOL
 ==============================================================
 */
 
-#define	OLD_PROTOCOL_VERSION	68
-// new protocol with UDP spoofing protection:
-#define	NEW_PROTOCOL_VERSION	71
-// 1.31 - 67
+// Vinitive has its own protocol numbers, so it never talks to Quake 3 /
+// OpenArena / ioquake3 clients and servers (they use 66-71): each side
+// rejects the other at connect time and ignores its server-info packets.
+// (Quake3e: 68 legacy, 71 with UDP spoofing protection.)
+#define	OLD_PROTOCOL_VERSION	80
+// protocol with UDP spoofing protection:
+#define	NEW_PROTOCOL_VERSION	81
 
 #define DEFAULT_PROTOCOL_VERSION	OLD_PROTOCOL_VERSION
 
@@ -305,7 +308,7 @@ extern const int demo_protocols[];
 #define	UPDATE_SERVER_NAME	"update.quake3arena.com"
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
-#define MASTER_SERVER_NAME	"master.quake3arena.com"
+#define MASTER_SERVER_NAME	""	// no public master until Vinitive runs its own
 #endif
 #ifndef AUTHORIZE_SERVER_NAME
 #define	AUTHORIZE_SERVER_NAME	"authorize.quake3arena.com"
@@ -316,7 +319,7 @@ extern const int demo_protocols[];
 #ifndef PORT_AUTHORIZE
 #define	PORT_AUTHORIZE		27952
 #endif
-#define	PORT_SERVER			27960
+#define	PORT_SERVER			29960	// away from Quake 3's 27960 so LAN scans don't meet
 #define	NUM_SERVER_PORTS	4		// broadcast scan this many ports after
 									// PORT_SERVER so a single machine can
 									// run multiple servers

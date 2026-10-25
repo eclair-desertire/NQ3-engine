@@ -571,7 +571,9 @@ void SV_DirectConnect( const netadr_t *from ) {
 		sv_proto = NEW_PROTOCOL_VERSION;
 	}
 
-	if ( cl_proto <= OLD_PROTOCOL_VERSION )
+	// only our own two protocols: anything lower used to be accepted as "legacy",
+	// which let Quake 3 / OpenArena clients (66-71) in
+	if ( cl_proto == OLD_PROTOCOL_VERSION )
 		compat = qtrue;
 	else
 	{

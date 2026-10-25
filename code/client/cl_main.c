@@ -816,7 +816,7 @@ static qboolean CL_DemoNameCallback_f( const char *filename, int length )
 	if ( version == com_protocol->integer )
 		return qtrue;
 
-	if ( version < 66 || version > NEW_PROTOCOL_VERSION )
+	if ( version < OLD_PROTOCOL_VERSION || version > NEW_PROTOCOL_VERSION )
 		return qfalse;
 
 	return qtrue;

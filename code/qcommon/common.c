@@ -37,7 +37,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 #include "../client/keys.h"
 
-const int demo_protocols[] = { 66, 67, OLD_PROTOCOL_VERSION, NEW_PROTOCOL_VERSION, 0 };
+const int demo_protocols[] = { OLD_PROTOCOL_VERSION, NEW_PROTOCOL_VERSION, 0 };
 
 #define USE_MULTI_SEGMENT // allocate additional zone segments on demand
 
@@ -3991,11 +3991,11 @@ void Com_Init( char *commandLine ) {
 	Com_StartupVariable( "sv_master2" );
 	Com_StartupVariable( "sv_master3" );
 	Cvar_Get( "sv_master1", MASTER_SERVER_NAME, CVAR_INIT );
-	Cvar_Get( "sv_master2", "directory.ioquake3.org", CVAR_INIT );
-	Cvar_Get( "sv_master3", "master.maverickservers.com", CVAR_INIT );
+	Cvar_Get( "sv_master2", "", CVAR_INIT );
+	Cvar_Get( "sv_master3", "", CVAR_INIT );
 
 	com_protocol = Cvar_Get( "protocol", XSTRING( DEFAULT_PROTOCOL_VERSION ), 0 );
-	Cvar_SetDescription( com_protocol, "Specify network protocol version number, use -compat suffix for OpenArena compatibility.");
+	Cvar_SetDescription( com_protocol, "Specify network protocol version number, use -compat suffix for the legacy variant without UDP spoofing protection.");
 	if ( Q_stristr( com_protocol->string, "-compat" ) > com_protocol->string ) {
 		// strip -compat suffix
 		Cvar_Set2( "protocol", va( "%i", com_protocol->integer ), qtrue );
