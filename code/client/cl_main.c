@@ -26,7 +26,6 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 cvar_t	*cl_noprint;
 cvar_t	*cl_debugMove;
-cvar_t	*cl_motd;
 
 #ifdef USE_RENDERER_DLOPEN
 static cvar_t *cl_renderer;
@@ -51,7 +50,6 @@ cvar_t	*cl_aviPipeFormat;
 
 cvar_t	*cl_activeAction;
 
-cvar_t	*cl_motdString;
 
 cvar_t	*cl_allowDownload;
 #ifdef USE_CURL
@@ -1138,7 +1136,6 @@ update cl_guid using QKEY_FILE and optional prefix
 */
 static void CL_UpdateGUID( const char *prefix, int prefix_len )
 {
-#ifdef USE_Q3KEY
 	fileHandle_t f;
 	int len;
 
@@ -1150,9 +1147,6 @@ static void CL_UpdateGUID( const char *prefix, int prefix_len )
 	else
 		Cvar_Set( "cl_guid", Com_MD5File( QKEY_FILE, QKEY_SIZE,
 			prefix, prefix_len ) );
-#else
-	Cvar_Set( "cl_guid", Com_MD5Buf( &cl_cdkey[0], sizeof(cl_cdkey), prefix, prefix_len));
-#endif
 }
 
 
@@ -1335,131 +1329,6 @@ void CL_ForwardCommandToServer( const char *string ) {
 		CL_AddReliableCommand( cmd, qfalse );
 	}
 }
-
-
-/*
-===================
-CL_RequestMotd
-
-===================
-*/
-#if 0
-static void CL_RequestMotd( void ) {
-	char		info[MAX_INFO_STRING];
-
-	if ( !cl_motd->integer ) {
-		return;
-	}
-	Com_Printf( "Resolving %s\n", UPDATE_SERVER_NAME );
-	if ( !NET_StringToAdr( UPDATE_SERVER_NAME, &cls.updateServer, NA_IP ) ) {
-		Com_Printf( "Couldn't resolve address\n" );
-		return;
-	}
-	cls.updateServer.port = BigShort( PORT_UPDATE );
-	Com_Printf( "%s resolved to %i.%i.%i.%i:%i\n", UPDATE_SERVER_NAME,
-		cls.updateServer.ip[0], cls.updateServer.ip[1],
-		cls.updateServer.ip[2], cls.updateServer.ip[3],
-		BigShort( cls.updateServer.port ) );
-
-	info[0] = 0;
-	// NOTE TTimo xoring against Com_Milliseconds, otherwise we may not have a true randomization
-	// only srand I could catch before here is tr_noise.c l:26 srand(1001)
-	// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=382
-	// NOTE: the Com_Milliseconds xoring only affects the lower 16-bit word,
-	//   but I decided it was enough randomization
-	Com_sprintf( cls.updateChallenge, sizeof( cls.updateChallenge ), "%i", ((rand() << 16) ^ rand()) ^ Com_Milliseconds());
-
-	Info_SetValueForKey( info, "challenge", cls.updateChallenge );
-	Info_SetValueForKey( info, "renderer", cls.glconfig.renderer_string );
-	Info_SetValueForKey( info, "version", com_version->string );
-
-	NET_OutOfBandPrint( NS_CLIENT, &cls.updateServer, "getmotd \"%s\"\n", info );
-}
-#endif
-
-/*
-===================
-CL_RequestAuthorization
-
-Authorization server protocol
------------------------------
-
-All commands are text in Q3 out of band packets (leading 0xff 0xff 0xff 0xff).
-
-Whenever the client tries to get a challenge from the server it wants to
-connect to, it also blindly fires off a packet to the authorize server:
-
-getKeyAuthorize <challenge> <cdkey>
-
-cdkey may be "demo"
-
-
-#OLD The authorize server returns a:
-#OLD
-#OLD keyAthorize <challenge> <accept | deny>
-#OLD
-#OLD A client will be accepted if the cdkey is valid and it has not been used by any other IP
-#OLD address in the last 15 minutes.
-
-
-The server sends a:
-
-getIpAuthorize <challenge> <ip>
-
-The authorize server returns a:
-
-ipAuthorize <challenge> <accept | deny | demo | unknown >
-
-A client will be accepted if a valid cdkey was sent by that ip (only) in the last 15 minutes.
-If no response is received from the authorize server after two tries, the client will be let
-in anyway.
-===================
-*/
-#ifndef STANDALONE
-static void CL_RequestAuthorization( void ) {
-	char	nums[64];
-	int		i, j, l;
-	cvar_t	*fs;
-
-	if ( !cls.authorizeServer.port ) {
-		Com_Printf( "Resolving %s\n", AUTHORIZE_SERVER_NAME );
-		if ( !NET_StringToAdr( AUTHORIZE_SERVER_NAME, &cls.authorizeServer, NA_IP ) ) {
-			Com_Printf( "Couldn't resolve address\n" );
-			return;
-		}
-
-		cls.authorizeServer.port = BigShort( PORT_AUTHORIZE );
-		Com_Printf( "%s resolved to %i.%i.%i.%i:%i\n", AUTHORIZE_SERVER_NAME,
-			cls.authorizeServer.ipv._4[0], cls.authorizeServer.ipv._4[1],
-			cls.authorizeServer.ipv._4[2], cls.authorizeServer.ipv._4[3],
-			BigShort( cls.authorizeServer.port ) );
-	}
-	if ( cls.authorizeServer.type == NA_BAD ) {
-		return;
-	}
-
-	// only grab the alphanumeric values from the cdkey, to avoid any dashes or spaces
-	j = 0;
-	l = strlen( cl_cdkey );
-	if ( l > 32 ) {
-		l = 32;
-	}
-	for ( i = 0 ; i < l ; i++ ) {
-		if ( ( cl_cdkey[i] >= '0' && cl_cdkey[i] <= '9' )
-				|| ( cl_cdkey[i] >= 'a' && cl_cdkey[i] <= 'z' )
-				|| ( cl_cdkey[i] >= 'A' && cl_cdkey[i] <= 'Z' )
-			 ) {
-			nums[j] = cl_cdkey[i];
-			j++;
-		}
-	}
-	nums[j] = 0;
-
-	fs = Cvar_Get( "cl_anonymous", "0", CVAR_INIT | CVAR_SYSTEMINFO );
-
-	NET_OutOfBandPrint(NS_CLIENT, &cls.authorizeServer, "getKeyAuthorize %i %s", fs->integer, nums );
-}
-#endif
 
 
 /*
@@ -2283,11 +2152,6 @@ static void CL_CheckForResend( void ) {
 
 	switch ( cls.state ) {
 	case CA_CONNECTING:
-		// requesting a challenge .. IPv6 users always get in as authorize server supports no ipv6.
-#ifndef STANDALONE
-		if (!Cvar_VariableIntegerValue("com_standalone") && clc.serverAddress.type == NA_IP && !Sys_IsLANAddress( &clc.serverAddress ) )
-			CL_RequestAuthorization();
-#endif
 		// The challenge request shall be followed by a client challenge so no malicious server can hijack this connection.
 		NET_OutOfBandPrint( NS_CLIENT, &clc.serverAddress, "getchallenge %d %s", clc.challenge, GAMENAME_FOR_MASTER );
 		break;
@@ -2350,35 +2214,6 @@ static void CL_CheckForResend( void ) {
 	default:
 		Com_Error( ERR_FATAL, "CL_CheckForResend: bad cls.state" );
 	}
-}
-
-
-/*
-===================
-CL_MotdPacket
-===================
-*/
-static void CL_MotdPacket( const netadr_t *from ) {
-	const char *challenge;
-	const char *info;
-
-	// if not from our server, ignore it
-	if ( !NET_CompareAdr( from, &cls.updateServer ) ) {
-		return;
-	}
-
-	info = Cmd_Argv(1);
-
-	// check challenge
-	challenge = Info_ValueForKey( info, "challenge" );
-	if ( strcmp( challenge, cls.updateChallenge ) ) {
-		return;
-	}
-
-	challenge = Info_ValueForKey( info, "motd" );
-
-	Q_strncpyz( cls.updateInfoString, info, sizeof( cls.updateInfoString ) );
-	Cvar_Set( "cl_motdString", challenge );
 }
 
 
@@ -2770,18 +2605,6 @@ static qboolean CL_ConnectionlessPacket( const netadr_t *from, msg_t *msg ) {
 			NET_OutOfBandPrint( NS_CLIENT, from, "%s", Cmd_Argv(1) );
 		}
 		return fromserver;
-	}
-
-	// cd check
-	if ( !Q_stricmp(c, "keyAuthorize") ) {
-		// we don't use these now, so dump them on the floor
-		return qfalse;
-	}
-
-	// global MOTD from id
-	if ( !Q_stricmp(c, "motd") ) {
-		CL_MotdPacket( from );
-		return qfalse;
 	}
 
 	// print string from server
@@ -3652,7 +3475,6 @@ test to see if a valid QKEY_FILE exists.  If one does not, try to generate
 it by filling it with 2048 bytes of random data.
 ===============
 */
-#ifdef USE_Q3KEY
 static void CL_GenerateQKey(void)
 {
 	int len = 0;
@@ -3685,7 +3507,6 @@ static void CL_GenerateQKey(void)
 		Com_Printf( "QKEY generated\n" );
 	}
 }
-#endif
 
 
 /*
@@ -3898,8 +3719,6 @@ void CL_Init( void ) {
 	//
 	cl_noprint = Cvar_Get( "cl_noprint", "0", 0 );
 	Cvar_SetDescription( cl_noprint, "Disable printing of information in the console." );
-	cl_motd = Cvar_Get( "cl_motd", "1", 0 );
-	Cvar_SetDescription( cl_motd, "Toggle the display of the 'Message of the day'. When Quake 3 Arena starts a map up, it sends the GL_RENDERER string to the Message Of The Day server at id. This responds back with a message of the day to the client." );
 
 	cl_timeout = Cvar_Get( "cl_timeout", "200", 0 );
 	Cvar_CheckRange( cl_timeout, "5", NULL, CV_INTEGER );
@@ -3974,8 +3793,6 @@ void CL_Init( void ) {
 	// if the cgame hasn't been started
 	Cvar_Get ("cg_autoswitch", "1", CVAR_ARCHIVE);
 
-	cl_motdString = Cvar_Get( "cl_motdString", "", CVAR_ROM );
-	Cvar_SetDescription( cl_motdString, "Message of the day string from id's master server, it is a read only variable." );
 
 	cv = Cvar_Get( "cl_maxPing", "800", CVAR_ARCHIVE_ND );
 	Cvar_CheckRange( cv, "100", "999", CV_INTEGER );
@@ -4066,9 +3883,7 @@ void CL_Init( void ) {
 	Cmd_AddCommand( "modelist", CL_ModeList_f );
 
 	Cvar_Set( "cl_running", "1" );
-#ifdef USE_MD5
 	CL_GenerateQKey();
-#endif
 	Cvar_Get( "cl_guid", "", CVAR_USERINFO | CVAR_ROM | CVAR_PROTECTED );
 	CL_UpdateGUID( NULL, 0 );
 

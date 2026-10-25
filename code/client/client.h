@@ -325,12 +325,7 @@ typedef struct {
 
 	int pingUpdateSource;		// source currently pinging or updating
 
-	// update server info
-	netadr_t	updateServer;
-	char		updateChallenge[MAX_TOKEN_CHARS];
-	char		updateInfoString[MAX_INFO_STRING];
-
-	netadr_t	authorizeServer;
+	char		updateInfoString[MAX_INFO_STRING];	// always empty, kept for the ui module ABI
 
 	// rendering info
 	glconfig_t	glconfig;

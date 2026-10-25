@@ -305,20 +305,12 @@ PROTOCOL
 // NOTE: that stuff only works with two digits protocols
 extern const int demo_protocols[];
 
-#define	UPDATE_SERVER_NAME	"update.quake3arena.com"
 // override on command line, config files etc.
 #ifndef MASTER_SERVER_NAME
 #define MASTER_SERVER_NAME	""	// no public master until Vinitive runs its own
 #endif
-#ifndef AUTHORIZE_SERVER_NAME
-#define	AUTHORIZE_SERVER_NAME	"authorize.quake3arena.com"
-#endif
 
 #define	PORT_MASTER			27950
-#define	PORT_UPDATE			27951
-#ifndef PORT_AUTHORIZE
-#define	PORT_AUTHORIZE		27952
-#endif
 #define	PORT_SERVER			29960	// away from Quake 3's 27960 so LAN scans don't meet
 #define	NUM_SERVER_PORTS	4		// broadcast scan this many ports after
 									// PORT_SERVER so a single machine can
@@ -684,9 +676,8 @@ issues.
 #define FS_ALL_REF		( FS_PURE_REF | FS_QAGAME_REF )
 #define FS_LOCK_REF		( FS_UI_REF | FS_CGAME_REF | FS_QAGAME_REF )
 
-// number of id paks that will never be autodownloaded from baseq3/missionpack
+// number of base game paks (pak0..pak8) that are never autodownloaded
 #define NUM_ID_PAKS		9
-#define NUM_TA_PAKS		4
 
 typedef enum {
 	H_SYSTEM,
@@ -941,10 +932,6 @@ MISC
 ==============================================================
 */
 
-// centralizing the declarations for cl_cdkey
-// https://zerowing.idsoftware.com/bugzilla/show_bug.cgi?id=470
-extern char cl_cdkey[34];
-
 // customizable client window title
 extern char cl_title[ MAX_CVAR_VALUE_STRING ];
 
@@ -1005,7 +992,6 @@ char		*Com_MD5Buf( const char *data, int length, const char *data2, int length2 
 void		Com_MD5Init( void );
 int			Com_MD5Addr( const netadr_t *addr, int timestamp );
 
-qboolean	Com_CDKeyValidate( const char *key, const char *checksum );
 qboolean	Com_EarlyParseCmdLine( char *commandLine, char *con_title, int title_size, int *vid_xpos, int *vid_ypos );
 int			Com_Split( char *in, char **out, int outsz, int delim );
 
@@ -1255,7 +1241,6 @@ void SV_RemoveDedicatedCommands( void );
 // UI interface
 //
 qboolean UI_GameCommand( void );
-qboolean UI_usesUniqueCDKey(void);
 
 /*
 ==============================================================

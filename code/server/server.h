@@ -249,7 +249,6 @@ typedef struct {
 	entityState_t	*snapshotEntities;		// [numSnapshotEntities]
 	int			nextHeartbeatTime;
 
-	netadr_t	authorizeAddress;			// for rcon return messages
 	int			masterResolveTime[MAX_MASTER_SERVERS]; // next svs.time that server should do dns lookup for master server
 
 	// common snapshot storage

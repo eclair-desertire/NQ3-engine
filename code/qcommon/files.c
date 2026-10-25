@@ -196,21 +196,6 @@ or configs will never get loaded from disk!
 
 */
 
-// every time a new demo pk3 file is built, this checksum must be updated.
-// the easiest way to get it is to just run the game and see what it spits out
-#define	DEMO_PAK0_CHECKSUM	2985612116u
-static const unsigned pak_checksums[] = {
-	1566731103u,
-	298122907u,
-	412165236u,
-	2991495316u,
-	1197932710u,
-	4087071573u,
-	3709064859u,
-	908855077u,
-	977125798u
-};
-
 // if this is defined, the executable positively won't work with any paks other
 // than the demo pak, even if productid is present.  This is only used for our
 // last demo release to prevent the mac and linux users from using the demo
@@ -309,7 +294,6 @@ static	cvar_t		*fs_homepath;
 // Also search the .app bundle for .pk3 files
 static  cvar_t          *fs_apppath;
 #endif
-static	cvar_t		*fs_steampath;
 
 static	cvar_t		*fs_basepath;
 static	cvar_t		*fs_basegame;
@@ -380,11 +364,8 @@ int	fs_lastPakIndex;
 static FILE*		missingFiles = NULL;
 #endif
 
-void Com_AppendCDKey( const char *filename );
-void Com_ReadCDKey( const char *filename );
 
 static int FS_GetModList( char *listbuf, int bufsize );
-static void FS_CheckIdPaks( void );
 void FS_Reload( void );
 
 
@@ -995,19 +976,6 @@ int FS_SV_FOpenFileRead( const char *filename, fileHandle_t *fp ) {
 			fd->handleFiles.file.o = Sys_FOpen( ospath, "rb" );
 		}
 
-		// Check fs_steampath too
-		if ( !fd->handleFiles.file.o && fs_steampath->string[0] )
-		{
-			// search steampath
-			ospath = FS_BuildOSPath( fs_steampath->string, filename, NULL );
-
-			if ( fs_debug->integer )
-			{
-				Com_Printf( "FS_SV_FOpenFileRead (fs_steampath): %s\n", ospath );
-			}
-
-			fd->handleFiles.file.o = Sys_FOpen( ospath, "rb" );
-		}
 	}
 
 	if( fd->handleFiles.file.o != NULL ) {
@@ -1703,13 +1671,6 @@ int FS_FOpenFileRead( const char *filename, fileHandle_t *file, qboolean uniqueF
 				}
 			}
 		}
-		return -1;
-	}
-
-	// make sure the q3key file is only readable by the quake3.exe at initialization
-	// any other time the key should only be accessed in memory using the provided functions
-	if ( com_fullyInitialized && strstr( filename, "q3key" ) ) {
-		*file = FS_INVALID_HANDLE;
 		return -1;
 	}
 
@@ -3838,7 +3799,7 @@ static int FS_GetModList( char *listbuf, int bufsize ) {
 	qboolean bDrop = qfalse;
 
 	// paths to search for mods
-	cvar_t *const *paths[] = { &fs_basepath, &fs_homepath, &fs_steampath };
+	cvar_t *const *paths[] = { &fs_basepath, &fs_homepath };
 
 	*listbuf = '\0';
 	nMods = nTotal = 0;
@@ -4428,8 +4389,8 @@ qboolean FS_ComparePaks( char *neededpaks, int len, qboolean dlstring ) {
 		// Ok, see if we have this pak file
 		havepak = qfalse;
 
-		// never autodownload any of the id paks
-		if ( FS_idPak(fs_serverReferencedPakNames[i], BASEGAME, NUM_ID_PAKS) || FS_idPak(fs_serverReferencedPakNames[i], BASETA, NUM_TA_PAKS) ) {
+		// never autodownload the base game's own paks
+		if ( FS_idPak(fs_serverReferencedPakNames[i], BASEGAME, NUM_ID_PAKS) ) {
 			continue;
 		}
 
@@ -4762,7 +4723,6 @@ static void FS_Startup( void ) {
 	Cvar_SetDescription( fs_basepath, "Write-protected CVAR specifying the path to the installation folder of the game." );
 	fs_basegame = Cvar_Get( "fs_basegame", BASEGAME, CVAR_INIT | CVAR_PROTECTED );
 	Cvar_SetDescription( fs_basegame, "Write-protected CVAR specifying the path to the base game(s) folder(s), separated by '/'." );
-	fs_steampath = Cvar_Get( "fs_steampath", Sys_SteamPath(), CVAR_INIT | CVAR_PROTECTED | CVAR_PRIVATE );
 
 	/* parse fs_basegame cvar */
 	if ( basegame_cnt == 0 || Q_stricmp( basegame, fs_basegame->string ) ) {
@@ -4819,13 +4779,6 @@ static void FS_Startup( void ) {
 #endif
 
 	// add search path elements in reverse priority order
-	if (fs_steampath->string[0]) {
-		// handle multiple basegames:
-		for (i = 0; i < basegame_cnt; i++) {
-			FS_AddGameDirectory( fs_steampath->string, basegames[i] );
-		}
-	}
-
 	if (fs_basepath->string[0]) {
 		// handle multiple basegames:
 		for (i = 0; i < basegame_cnt; i++) {
@@ -4855,9 +4808,6 @@ static void FS_Startup( void ) {
 
 	// check for additional game folder for mods
 	if ( fs_gamedirvar->string[0] != '\0' && !FS_IsBaseGame( fs_gamedirvar->string ) ) {
-		if ( fs_steampath->string[0] != '\0' ) {
-			FS_AddGameDirectory( fs_steampath->string, fs_gamedirvar->string );
-		}
 		if ( fs_basepath->string[0] != '\0' ) {
 			FS_AddGameDirectory( fs_basepath->string, fs_gamedirvar->string );
 		}
@@ -4878,11 +4828,6 @@ static void FS_Startup( void ) {
 
 	end = Sys_Milliseconds();
 
-	Com_ReadCDKey( basegame );
-	if ( !FS_IsBaseGame( fs_gamedirvar->string ) ) {
-		Com_AppendCDKey( fs_gamedirvar->string );
-	}
-
 	// add our commands
 	Cmd_AddCommand( "path", FS_Path_f );
 	Cmd_AddCommand( "dir", FS_Dir_f );
@@ -4901,11 +4846,6 @@ static void FS_Startup( void ) {
 	Com_Printf( "%d files in %d pk3 files\n", fs_packFiles, fs_packCount );
 
 	fs_gamedirvar->modified = qfalse; // We just loaded, it's not modified
-
-	// check original q3a files
-	if ( FS_IsBaseGame( BASEGAME ) || FS_IsBaseGame( BASEDEMO ) ) {
-		FS_CheckIdPaks();
-	}
 
 #ifdef FS_MISSING
 	if (missingFiles == NULL) {
@@ -4934,111 +4874,6 @@ static void FS_PrintSearchPaths( void )
 			Com_Printf( " * %s\n", path->dir->path );
 
 		path = path->next;
-	}
-}
-
-
-/*
-===================
-FS_CheckIdPaks
-
-Checks that pak0.pk3 is present and its checksum is correct
-Note: If you're building a game that doesn't depend on the
-Q3 media pak0.pk3, you'll want to remove this function
-===================
-*/
-static void FS_CheckIdPaks( void )
-{
-	const searchpath_t *path;
-	const char* pakBasename;
-	qboolean founddemo = qfalse;
-	unsigned foundPak = 0;
-
-	for ( path = fs_searchpaths; path; path = path->next )
-	{
-		if ( !path->pack )
-			continue;
-
-		pakBasename = path->pack->pakBasename;
-
-		if(!Q_stricmpn( path->pack->pakGamename, BASEDEMO, MAX_OSPATH )
-		   && !Q_stricmpn( pakBasename, "pak0", MAX_OSPATH ))
-		{
-			founddemo = qtrue;
-
-			if( path->pack->checksum == DEMO_PAK0_CHECKSUM )
-			{
-				Com_Printf( "\n\n"
-						"**************************************************\n"
-						"WARNING: It looks like you're using pak0.pk3\n"
-						"from the demo. This may work fine, but it is not\n"
-						"guaranteed or supported.\n"
-						"**************************************************\n\n\n" );
-			}
-		}
-
-		else if(!Q_stricmpn( path->pack->pakGamename, BASEGAME, MAX_OSPATH )
-			&& strlen(pakBasename) == 4 && !Q_stricmpn( pakBasename, "pak", 3 )
-			&& pakBasename[3] >= '0' && pakBasename[3] <= '8')
-		{
-			if( (unsigned int)path->pack->checksum != pak_checksums[pakBasename[3]-'0'] )
-			{
-				FS_PrintSearchPaths();
-
-				if(pakBasename[3] == '0')
-				{
-					Com_Printf("\n\n"
-						"**************************************************\n"
-						"ERROR: pak0.pk3 is present but its checksum (%u)\n"
-						"is not correct. Please re-copy pak0.pk3 from your\n"
-						"legitimate Q3 CDROM.\n"
-						"**************************************************\n\n\n",
-						path->pack->checksum );
-				}
-				else
-				{
-					Com_Printf("\n\n"
-						"**************************************************\n"
-						"ERROR: pak%d.pk3 is present but its checksum (%u)\n"
-						"is not correct. Please re-install Quake 3 Arena \n"
-						"Point Release v1.32 pk3 files\n"
-						"**************************************************\n\n\n",
-						pakBasename[3]-'0', path->pack->checksum );
-				}
-				Com_Error(ERR_FATAL, "\n* You need to install correct Quake III Arena files in order to play *");
-			}
-
-			foundPak |= 1<<(pakBasename[3]-'0');
-		}
-	}
-
-	if(!founddemo && (foundPak & 0x1ff) != 0x1ff )
-	{
-		FS_PrintSearchPaths();
-
-		if((foundPak&1) != 1 )
-		{
-			Com_Printf("\n\n"
-			"pak0.pk3 is missing. Please copy it\n"
-			"from your legitimate Q3 CDROM.\n");
-		}
-
-		if((foundPak&0x1fe) != 0x1fe )
-		{
-			Com_Printf("\n\n"
-			"Point Release files are missing. Please\n"
-			"re-install the 1.32 point release.\n");
-		}
-
-		Com_Printf("\n\n"
-			"Also check that your Q3 executable is in\n"
-			"the correct place and that every file\n"
-			"in the %s directory is present and readable.\n", BASEGAME);
-
-		if(!fs_gamedirvar->string[0]
-		|| !Q_stricmp( fs_gamedirvar->string, BASEGAME )
-		|| !Q_stricmp( fs_gamedirvar->string, BASETA ))
-			Com_Error(ERR_FATAL, "\n*** you need to install Quake III Arena in order to play ***");
 	}
 }
 
