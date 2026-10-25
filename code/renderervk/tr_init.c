@@ -85,6 +85,8 @@ cvar_t	*r_vbo;
 #endif
 cvar_t	*r_fbo;
 cvar_t	*r_hdr;
+cvar_t	*r_tonemap;
+cvar_t	*r_exposure;
 cvar_t	*r_bloom;
 cvar_t	*r_bloom_threshold;
 cvar_t	*r_bloom_intensity;
@@ -1791,7 +1793,16 @@ static void R_Register( void )
 	r_fbo = ri.Cvar_Get( "r_fbo", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_SetDescription( r_fbo, "Use framebuffer objects, enables gamma correction in windowed mode and allows arbitrary video size and screenshot/video capture.\n Required for bloom, HDR rendering, anti-aliasing and greyscale effects." );
 	r_hdr = ri.Cvar_Get( "r_hdr", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
-	ri.Cvar_SetDescription(r_hdr, "Enables high dynamic range frame buffer texture format. Requires \\r_fbo 1.\n -1: 4-bit, for testing purposes, heavy color banding, might not work on all systems\n  0: 8 bit, default, moderate color banding with multi-stage shaders\n  1: 16 bit, enhanced blending precision, no color banding, might decrease performance on AMD / Intel GPUs\n" );
+	ri.Cvar_CheckRange( r_hdr, "-1", "2", CV_INTEGER );
+	ri.Cvar_SetDescription(r_hdr, "Enables high dynamic range frame buffer texture format. Requires \\r_fbo 1.\n -1: 4-bit, for testing purposes, heavy color banding, might not work on all systems\n  0: 8 bit, default, moderate color banding with multi-stage shaders\n  1: 16 bit, enhanced blending precision, no color banding, might decrease performance on AMD / Intel GPUs\n  2: 16 bit float, true HDR: brightness above 1.0 survives until tonemapping (\\r_tonemap), bloom runs in HDR too\n" );
+	r_tonemap = ri.Cvar_Get( "r_tonemap", "0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_tonemap, "0", "2", CV_INTEGER );
+	ri.Cvar_SetGroup( r_tonemap, CVG_RENDERER );
+	ri.Cvar_SetDescription( r_tonemap, "Tonemapping of the final frame, compresses highlights instead of clipping them. Requires \\r_fbo 1, works best with \\r_hdr 2.\n 0: off\n 1: ACES (filmic, contrasty)\n 2: AgX (keeps hues of saturated lights, good for neon)" );
+	r_exposure = ri.Cvar_Get( "r_exposure", "1.0", CVAR_ARCHIVE_ND );
+	ri.Cvar_CheckRange( r_exposure, "0.1", "16", CV_FLOAT );
+	ri.Cvar_SetGroup( r_exposure, CVG_RENDERER );
+	ri.Cvar_SetDescription( r_exposure, "Exposure multiplier applied before tonemapping (\\r_tonemap)." );
 	r_bloom = ri.Cvar_Get( "r_bloom", "0", CVAR_ARCHIVE_ND | CVAR_LATCH );
 	ri.Cvar_CheckRange( r_bloom, "0", "1", CV_INTEGER );
 	ri.Cvar_SetDescription(r_bloom, "Enables bloom post-processing effect. Requires \\r_fbo 1.");

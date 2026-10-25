@@ -1442,7 +1442,18 @@ static qboolean vk_blit_enabled( VkPhysicalDevice physical_device, const VkForma
 }
 
 
-static VkFormat get_hdr_format( VkFormat base_format )
+static qboolean float_target_supported( VkPhysicalDevice physical_device, VkFormat format )
+{
+	const VkFormatFeatureFlags need = VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT | VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BLEND_BIT |
+		VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT;
+	VkFormatProperties props;
+
+	qvkGetPhysicalDeviceFormatProperties( physical_device, format, &props );
+	return ( props.optimalTilingFeatures & need ) == need ? qtrue : qfalse;
+}
+
+
+static VkFormat get_hdr_format( VkPhysicalDevice physical_device, VkFormat base_format )
 {
 	if ( r_fbo->integer == 0 ) {
 		return base_format;
@@ -1451,6 +1462,12 @@ static VkFormat get_hdr_format( VkFormat base_format )
 	switch ( r_hdr->integer ) {
 		case -1: return VK_FORMAT_B4G4R4A4_UNORM_PACK16;
 		case 1: return VK_FORMAT_R16G16B16A16_UNORM;
+		case 2:
+			if ( float_target_supported( physical_device, VK_FORMAT_R16G16B16A16_SFLOAT ) ) {
+				return VK_FORMAT_R16G16B16A16_SFLOAT;
+			}
+			ri.Printf( PRINT_WARNING, "...float framebuffer not supported, falling back to r_hdr 1\n" );
+			return VK_FORMAT_R16G16B16A16_UNORM;
 		default: return base_format;
 	}
 }
@@ -1566,11 +1583,15 @@ static void setup_surface_formats( VkPhysicalDevice physical_device )
 {
 	vk.depth_format = get_depth_format( physical_device );
 
-	vk.color_format = get_hdr_format( vk.base_format.format );
+	vk.color_format = get_hdr_format( physical_device, vk.base_format.format );
 
 	vk.capture_format = VK_FORMAT_R8G8B8A8_UNORM;
 
-	vk.bloom_format = vk.base_format.format;
+	// with a float framebuffer bloom must keep the >1.0 highlights it feeds on
+	if ( vk.color_format == VK_FORMAT_R16G16B16A16_SFLOAT )
+		vk.bloom_format = vk.color_format;
+	else
+		vk.bloom_format = vk.base_format.format;
 
 	vk.blitEnabled = vk_blit_enabled( physical_device, vk.color_format, vk.capture_format );
 
@@ -3547,8 +3568,9 @@ static void vk_create_attachments( void )
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, &vk.msaa_image, &vk.msaa_image_view, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, qtrue );
 		}
 
-		if ( r_ext_supersample->integer ) {
-			// capture buffer
+		{
+			// capture buffer: screenshots and video go through the final post-process
+			// shader (gamma, tonemapping) instead of reading the raw HDR framebuffer
 			usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 			create_color_attachment( gls.captureWidth, gls.captureHeight, VK_SAMPLE_COUNT_1_BIT, vk.capture_format,
 				usage, &vk.capture.image, &vk.capture.image_view, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, qfalse );
@@ -5146,7 +5168,7 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	VkGraphicsPipelineCreateInfo create_info;
 	VkViewport viewport;
 	VkRect2D scissor;
-	VkSpecializationMapEntry spec_entries[11];
+	VkSpecializationMapEntry spec_entries[13];
 	VkSpecializationInfo frag_spec_info;
 	VkPipeline *pipeline;
 	VkShaderModule fsmodule;
@@ -5168,6 +5190,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 		int depth_r;
 		int depth_g;
 		int depth_b;
+		int tonemap;
+		float exposure;
 	} frag_spec_data;
 
 	switch ( program_index ) {
@@ -5235,6 +5259,8 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	frag_spec_data.bloom_threshold_mode = r_bloom_threshold_mode->integer;
 	frag_spec_data.bloom_modulate = r_bloom_modulate->integer;
 	frag_spec_data.dither = r_dither->integer;
+	frag_spec_data.tonemap = r_tonemap->integer;
+	frag_spec_data.exposure = r_exposure->value;
 
 	if ( !vk_surface_format_color_depth( vk.present_format.format, &frag_spec_data.depth_r, &frag_spec_data.depth_g, &frag_spec_data.depth_b ) )
 		ri.Printf( PRINT_ALL, "Format %s not recognized, dither to assume 8bpc\n", vk_format_string( vk.base_format.format ) );
@@ -5283,7 +5309,15 @@ void vk_create_post_process_pipeline( int program_index, uint32_t width, uint32_
 	spec_entries[10].offset = offsetof(struct FragSpecData, depth_b);
 	spec_entries[10].size = sizeof(frag_spec_data.depth_b);
 
-	frag_spec_info.mapEntryCount = 11;
+	spec_entries[11].constantID = 11;
+	spec_entries[11].offset = offsetof( struct FragSpecData, tonemap );
+	spec_entries[11].size = sizeof( frag_spec_data.tonemap );
+
+	spec_entries[12].constantID = 12;
+	spec_entries[12].offset = offsetof( struct FragSpecData, exposure );
+	spec_entries[12].size = sizeof( frag_spec_data.exposure );
+
+	frag_spec_info.mapEntryCount = 13;
 	frag_spec_info.pMapEntries = spec_entries;
 	frag_spec_info.dataSize = sizeof( frag_spec_data );
 	frag_spec_info.pData = &frag_spec_data;
