@@ -322,7 +322,7 @@ void Cbuf_Execute( void )
 		} else {
 			++i;
 			// skip all repeating newlines/semicolons/whitespaces
-			while ( i < cmd_text.cursize && (text[i] == '\n' || text[i] == '\r' || text[i] == ';' || ( text[i] != '\0' && text[i] <= ' ' ) ) ) {
+			while ( i < cmd_text.cursize && (text[i] == '\n' || text[i] == '\r' || text[i] == ';' || ( text[i] != '\0' && (byte)text[i] <= ' ' ) ) ) {
 				++i;
 			}
 		}
@@ -639,7 +639,7 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 
 		while ( 1 ) {
 			// skip whitespace
-			while ( *text && *text <= ' ' ) {
+			while ( *text && *(const byte *)text <= ' ' ) {
 				text++;
 			}
 			if ( !*text ) {
@@ -690,7 +690,7 @@ static void Cmd_TokenizeString2( const char *text_in, qboolean ignoreQuotes ) {
 		cmd_argc++;
 
 		// skip until whitespace, quote, or command
-		while ( *text > ' ' ) {
+		while ( *(const byte *)text > ' ' ) {
 			if ( !ignoreQuotes && text[0] == '"' ) {
 				break;
 			}

@@ -564,7 +564,7 @@ void CL_ConsolePrint( const char *txt ) {
 
 		// count word length
 		for ( l = 0 ; l < con.linewidth ; l++ ) {
-			if ( txt[l] <= ' ' ) {
+			if ( (unsigned char)txt[l] <= ' ' ) {
 				break;
 			}
 		}

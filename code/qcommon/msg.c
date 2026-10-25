@@ -289,8 +289,8 @@ void MSG_WriteString( msg_t *sb, const char *s ) {
 	}
 
 	for ( i = 0 ; i < l; i++ ) {
-		// get rid of 0x80+ and '%' chars, because old clients don't like them
-		if ( (byte)s[i] & 0x80 || s[i] == '%' )
+		// get rid of '%' chars; bytes 0x80+ are kept for CP1251 Cyrillic
+		if ( s[i] == '%' )
 			v = '.';
 		else
 			v = s[i];
@@ -311,8 +311,8 @@ void MSG_WriteBigString( msg_t *sb, const char *s ) {
 	}
 
 	for ( i = 0 ; i < l ; i++ ) {
-		// get rid of 0x80+ and '%' chars, because old clients don't like them
-		if ( (byte)s[i] & 0x80 || s[i] == '%' )
+		// get rid of '%' chars; bytes 0x80+ are kept for CP1251 Cyrillic
+		if ( s[i] == '%' )
 			v = '.';
 		else
 			v = s[i];
@@ -407,10 +407,7 @@ const char *MSG_ReadString( msg_t *msg ) {
 		if ( c == '%' ) {
 			c = '.';
 		} else
-		// don't allow higher ascii values
-		if ( c > 127 ) {
-			c = '.';
-		}
+		// bytes 128-255 are allowed: the game uses CP1251 for Cyrillic
 		string[ l++ ] = c;
 	} while ( qtrue );
 	
@@ -434,10 +431,7 @@ const char *MSG_ReadBigString( msg_t *msg ) {
 		if ( c == '%' ) {
 			c = '.';
 		} else
-		// don't allow higher ascii values
-		if ( c > 127 ) {
-			c = '.';
-		}
+		// bytes 128-255 are allowed: the game uses CP1251 for Cyrillic
 		string[ l++ ] = c;
 	} while ( qtrue );
 	
@@ -461,10 +455,7 @@ const char *MSG_ReadStringLine( msg_t *msg ) {
 		if ( c == '%' ) {
 			c = '.';
 		} else
-		// don't allow higher ascii values
-		if ( c > 127 ) {
-			c = '.';
-		}
+		// bytes 128-255 are allowed: the game uses CP1251 for Cyrillic
 		string[ l++ ] = c;
 	} while ( qtrue );
 	

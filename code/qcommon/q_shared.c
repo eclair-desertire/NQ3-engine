@@ -207,12 +207,12 @@ int Com_Split( char *in, char **out, int outsz, int delim )
 	char **o = out, **end = out + outsz;
 	// skip leading spaces
 	if ( delim >= ' ' ) {
-		while( (c = *in) != '\0' && c <= ' ' )
+		while( (c = *(const byte *)in) != '\0' && c <= ' ' )
 			in++; 
 	}
 	*out = in; out++;
 	while( out < end ) {
-		while( (c = *in) != '\0' && c != delim )
+		while( (c = *(const byte *)in) != '\0' && c != delim )
 			in++; 
 		*in = '\0';
 		if ( !c ) {
@@ -224,13 +224,13 @@ int Com_Split( char *in, char **out, int outsz, int delim )
 		in++;
 		// skip leading spaces
 		if ( delim >= ' ' ) {
-			while( (c = *in) != '\0' && c <= ' ' )
+			while( (c = *(const byte *)in) != '\0' && c <= ' ' )
 				in++; 
 		}
 		*out = in; out++;
 	}
 	// sanitize last value
-	while( (c = *in) != '\0' && c != delim )
+	while( (c = *(const byte *)in) != '\0' && c != delim )
 		in++; 
 	*in = '\0';
 	c = out - o;
@@ -511,7 +511,7 @@ a newline.
 static const char *SkipWhitespace( const char *data, qboolean *hasNewLines ) {
 	int c;
 
-	while( (c = *data) <= ' ') {
+	while( (c = *(const byte *)data) <= ' ') {
 		if( !c ) {
 			return NULL;
 		}
@@ -533,7 +533,7 @@ int COM_Compress( char *data_p ) {
 	qboolean newline = qfalse, whitespace = qfalse;
 
 	in = out = data_p;
-	while ((c = *in) != '\0') {
+	while ((c = *(const byte *)in) != '\0') {
 		// skip double slash comments
 		if ( c == '/' && in[1] == '/' ) {
 			while (*in && *in != '\n') {
@@ -569,7 +569,7 @@ int COM_Compress( char *data_p ) {
 				*out++ = c;
 				in++;
 				while (1) {
-					c = *in;
+					c = *(const byte *)in;
 					if (c && c != '"') {
 						*out++ = c;
 						in++;
@@ -627,7 +627,7 @@ const char *COM_ParseExt( const char **data_p, qboolean allowLineBreaks )
 			return com_token;
 		}
 
-		c = *data;
+		c = *(const byte *)data;
 
 		// skip double slash comments
 		if ( c == '/' && data[1] == '/' )
@@ -669,7 +669,7 @@ const char *COM_ParseExt( const char **data_p, qboolean allowLineBreaks )
 		data++;
 		while ( 1 )
 		{
-			c = *data;
+			c = *(const byte *)data;
 			if ( c == '"' || c == '\0' )
 			{
 				if ( c == '"' )
@@ -700,7 +700,7 @@ const char *COM_ParseExt( const char **data_p, qboolean allowLineBreaks )
 			len++;
 		}
 		data++;
-		c = *data;
+		c = *(const byte *)data;
 	} while ( c > ' ' );
 
 	com_token[ len ] = '\0';
@@ -1681,7 +1681,7 @@ char *Q_CleanStr( char *string ) {
 		if ( Q_IsColorString( s ) ) {
 			s++;
 		}		
-		else if ( c >= 0x20 && c <= 0x7E ) {
+		else if ( ( c >= 0x20 && c <= 0x7E ) || (unsigned char)c >= 0x80 ) {
 			*d++ = c;
 		}
 		s++;

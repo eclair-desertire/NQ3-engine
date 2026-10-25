@@ -323,6 +323,46 @@ static qboolean directMap( const WPARAM chr ) {
 
 /*
 ==================
+MapCyrillic
+
+Cyrillic letters reach the game as CP1251, its 8-bit charset.
+The window is ANSI, so WM_CHAR carries a byte in the code page of
+the active keyboard layout; convert it through Unicode.
+Returns 0 for anything that isn't a Cyrillic letter.
+==================
+*/
+static int MapCyrillic( WPARAM wParam )
+{
+	WCHAR	wc;
+	char	ch, cpbuf[8];
+	UINT	cp = CP_ACP;
+
+	if ( wParam > 0xFF ) {
+		wc = (WCHAR)wParam;		// already UTF-16
+	} else {
+		ch = (char)wParam;
+		if ( GetLocaleInfoA( MAKELCID( LOWORD( (DWORD_PTR)GetKeyboardLayout( 0 ) ), SORT_DEFAULT ),
+				LOCALE_IDEFAULTANSICODEPAGE, cpbuf, sizeof( cpbuf ) ) ) {
+			cp = atoi( cpbuf );
+		}
+		if ( !MultiByteToWideChar( cp, 0, &ch, 1, &wc, 1 ) ) {
+			return 0;
+		}
+	}
+
+	if ( wc >= 0x410 && wc <= 0x44F )
+		return 0xC0 + ( wc - 0x410 );
+	if ( wc == 0x401 )	// YO
+		return 0xA8;
+	if ( wc == 0x451 )	// yo
+		return 0xB8;
+
+	return 0;
+}
+
+
+/*
+==================
 MapChar
 
 Map input to ASCII charset
@@ -355,6 +395,13 @@ static int MapChar( WPARAM wParam, byte scancode )
 
 	if ( scancode == 0x53 )
 		return '.';
+
+	if ( wParam >= 0x80 ) {
+		int cyr = MapCyrillic( wParam );
+		if ( cyr ) {
+			return cyr;
+		}
+	}
 
 	if ( directMap( wParam ) || scancode > 0x39 )
 	{
