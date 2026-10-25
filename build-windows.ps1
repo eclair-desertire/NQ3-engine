@@ -19,6 +19,14 @@ function Invoke-MSBuild([string[]]$arguments) {
     if ($LASTEXITCODE -ne 0) { throw "MSBuild failed: $arguments" }
 }
 
+# GLSL -> SPIR-V (shader_data.c); skipped when glslang or Python is missing,
+# the committed shader_data.c is then used as is
+$py = Get-Command python -ErrorAction SilentlyContinue
+if ($py) {
+    & $py.Source (Join-Path $PSScriptRoot 'tools\build_shaders.py')
+    if ($LASTEXITCODE -ne 0) { throw 'shader build failed' }
+}
+
 Push-Location $dir
 try {
     Invoke-MSBuild @('quake3e-ded.vcxproj')
